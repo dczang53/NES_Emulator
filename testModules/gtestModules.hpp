@@ -7,6 +7,9 @@
 
 #include <map>
 
+// NOTE: just a proof-of-concept and definitely not 100% comprehensive
+// use something like nestest.nes to test CPU (see "https://wiki.nesdev.org/w/index.php/Emulator_tests")
+
 namespace NES
 {
     struct GTESTmemory : public Memory  // used only for gtests; not be used in actual application
@@ -20,6 +23,8 @@ namespace NES
         {
             delete[] cpuMemory;
         }
+
+        void initCartridge(std::string filename) {}
 
         uint8_t cpuRead(uint16_t addr)
         {
@@ -54,13 +59,20 @@ namespace NES
         uint8_t ppuRead(uint16_t addr) {return 0x00;}
         bool ppuWrite(uint16_t addr, uint8_t data) {return false;}
         void connectCPUandPPU(ricoh2A03::CPU *c, ricoh2C02::PPU *p) {}
-        uint8_t controllerRead(uint8_t player) {}
+        uint8_t controllerRead(uint8_t player) {return 0x00;}
+        bool mapperIrqReq() {return false;}
+        void mapperIrqReset() {}
         void controllerWrite(uint8_t player, uint8_t data) {}
         void toggleCpuCycle() {}
         void ppuRequestDMA() {}
         void finalizeDMAreq() {}
-        bool DMAactive() {}
+        bool DMAactive() {return false;}
         void handleDMA() {}
+
+        #ifdef DEBUG
+            uint8_t cpuReadDebug(uint16_t addr) {return 0x00;}
+            uint8_t ppuReadDebug(uint16_t addr) {return 0x00;}
+        #endif
 
         uint8_t *cpuMemory = nullptr;   // completely public memory to read/modify during debugging
         // no need for mmc; cpu/ppu only sees memory
@@ -113,7 +125,7 @@ namespace NES
                 mem->cpuWrite(iter->first, iter->second);
             while (ticks > 0)
             {
-                cpu->tick();
+                cpu->tick(true);
                 ticks--;
             }
             EXPECT_EQ(cpu->instrDone(), true);
@@ -772,13 +784,13 @@ namespace NES
     TEST_F(cpuTest, testPHP)    // 0x08
     {
         // IMP
-        cpuState initStateIMP {0x0000, 0xFF, 0xCC, 0xBB, 0xAA, 0xEE};
+        cpuState initStateIMP {0x0000, 0xFF, 0xCC, 0xBB, 0xAA, 0x83};
         std::map<uint16_t, uint8_t> initMemIMP {
             {0x0000, 0x08}
         };
-        cpuState finalStateIMP {0x0001, 0xFE, 0xCC, 0xBB, 0xAA, 0xEE};
+        cpuState finalStateIMP {0x0001, 0xFE, 0xCC, 0xBB, 0xAA, 0x83};
         std::map<uint16_t, uint8_t> finalMemIMP {
-            {0x01FF, 0xEE}
+            {0x01FF, (0x83 | ricoh2A03::statusMask::breakCommand | ricoh2A03::statusMask::unused)}
         };
         test(3, initStateIMP, initMemIMP, finalStateIMP, finalMemIMP);
     }
@@ -1440,68 +1452,68 @@ namespace NES
     TEST_F(cpuTest, testSBC)    // 0xE1 0xE5 0xE9 0xED 0xF1 0xF5 0xF9 0xFD
     {
         // INDX
-        cpuState initStateINDX {0x0000, 0xFF, 0x22, 0x04, 0x00, ricoh2A03::carryFlag};
+        cpuState initStateINDX {0x0000, 0xFF, 0x22, 0x04, 0x00, 0x00};
         std::map<uint16_t, uint8_t> initMemINDX {
             {0x0000, 0xE1}, {0x0001, 0xAA},
             {0x00AE, 0xBB}, {0x00AF, 0xCC},
             {0xCCBB, 0xEA}
         };
-        cpuState finalStateINDX {0x0002, 0xFF, 0x38, 0x04, 0x00, ricoh2A03::carryFlag};
+        cpuState finalStateINDX {0x0002, 0xFF, 0x37, 0x04, 0x00, 0x00};
         std::map<uint16_t, uint8_t> finalMemINDX {};
         test(6, initStateINDX, initMemINDX, finalStateINDX, finalMemINDX);
 
-        // INDX (not using carryFlag)
-        cpuState initStateINDX2 {0x0000, 0xFF, 0x22, 0x04, 0x00, 0x00};
+        // INDX (using carryFlag)
+        cpuState initStateINDX2 {0x0000, 0xFF, 0x22, 0x04, 0x00, ricoh2A03::carryFlag};
         std::map<uint16_t, uint8_t> initMemINDX2 {
             {0x0000, 0xE1}, {0x0001, 0xAA},
             {0x00AE, 0xBB}, {0x00AF, 0xCC},
             {0xCCBB, 0xEA}
         };
-        cpuState finalStateINDX2 {0x0002, 0xFF, 0x37, 0x04, 0x00, ricoh2A03::carryFlag};
+        cpuState finalStateINDX2 {0x0002, 0xFF, 0x38, 0x04, 0x00, 0x00};
         std::map<uint16_t, uint8_t> finalMemINDX2 {};
         test(6, initStateINDX2, initMemINDX2, finalStateINDX2, finalMemINDX2);
 
-        // INDX (not setting carryFlag)
-        cpuState initStateINDX3 {0x0000, 0xFF, 0x5A, 0x04, 0x00, ricoh2A03::carryFlag};
+        // INDX (setting carryFlag)
+        cpuState initStateINDX3 {0x0000, 0xFF, 0x5A, 0x04, 0x00, 0x00};
         std::map<uint16_t, uint8_t> initMemINDX3 {
             {0x0000, 0xE1}, {0x0001, 0xAA},
             {0x00AE, 0xBB}, {0x00AF, 0xCC},
             {0xCCBB, 0x38}
         };
-        cpuState finalStateINDX3 {0x0002, 0xFF, 0x22, 0x04, 0x00, 0x00};
+        cpuState finalStateINDX3 {0x0002, 0xFF, 0x21, 0x04, 0x00, ricoh2A03::carryFlag};
         std::map<uint16_t, uint8_t> finalMemINDX3 {};
         test(6, initStateINDX3, initMemINDX3, finalStateINDX3, finalMemINDX3);
 
         // INDX (zeroFlag)
-        cpuState initStateINDX4 {0x0000, 0xFF, 0xEE, 0x04, 0x00, ricoh2A03::carryFlag};
+        cpuState initStateINDX4 {0x0000, 0xFF, 0xEE, 0x04, 0x00, 0x00};
         std::map<uint16_t, uint8_t> initMemINDX4 {
             {0x0000, 0xE1}, {0x0001, 0xAA},
             {0x00AE, 0xBB}, {0x00AF, 0xCC},
-            {0xCCBB, 0xEE}
+            {0xCCBB, 0xED}
         };
-        cpuState finalStateINDX4 {0x0002, 0xFF, 0x00, 0x04, 0x00, ricoh2A03::zeroFlag};
+        cpuState finalStateINDX4 {0x0002, 0xFF, 0x00, 0x04, 0x00, (ricoh2A03::carryFlag | ricoh2A03::zeroFlag)};
         std::map<uint16_t, uint8_t> finalMemINDX4 {};
         test(6, initStateINDX4, initMemINDX4, finalStateINDX4, finalMemINDX4);
 
-        // INDX (overflowFlag) (+ - -) (carryFlag should be set)
-        cpuState initStateINDX5 {0x0000, 0xFF, 0x7F, 0x04, 0x00, 0x00};
+        // INDX (overflowFlag) (+ - -) (carryFlag should be unset)
+        cpuState initStateINDX5 {0x0000, 0xFF, 0x7F, 0x04, 0x00, ricoh2A03::carryFlag};
         std::map<uint16_t, uint8_t> initMemINDX5 {
             {0x0000, 0xE1}, {0x0001, 0xAA},
             {0x00AE, 0xBB}, {0x00AF, 0xCC},
             {0xCCBB, 0xFD}
         };
-        cpuState finalStateINDX5 {0x0002, 0xFF, 0x81, 0x04, 0x00, (ricoh2A03::carryFlag | ricoh2A03::overflowFlag | ricoh2A03::negativeFlag)};
+        cpuState finalStateINDX5 {0x0002, 0xFF, 0x82, 0x04, 0x00, (ricoh2A03::overflowFlag | ricoh2A03::negativeFlag)};
         std::map<uint16_t, uint8_t> finalMemINDX5 {};
         test(6, initStateINDX5, initMemINDX5, finalStateINDX5, finalMemINDX5);
 
-        // INDX (overflowFlag) (- + +) (carryFlag should be zeroed)
-        cpuState initStateINDX6 {0x0000, 0xFF, 0x82, 0x04, 0x00, ricoh2A03::carryFlag};
+        // INDX (overflowFlag) (- + +) (carryFlag should be set)
+        cpuState initStateINDX6 {0x0000, 0xFF, 0x82, 0x04, 0x00, 0x00};
         std::map<uint16_t, uint8_t> initMemINDX6 {
             {0x0000, 0xE1}, {0x0001, 0xAA},
             {0x00AE, 0xBB}, {0x00AF, 0xCC},
             {0xCCBB, 0x04}
         };
-        cpuState finalStateINDX6 {0x0002, 0xFF, 0x7E, 0x04, 0x00, ricoh2A03::overflowFlag};
+        cpuState finalStateINDX6 {0x0002, 0xFF, 0x7D, 0x04, 0x00, (ricoh2A03::carryFlag | ricoh2A03::overflowFlag)};
         std::map<uint16_t, uint8_t> finalMemINDX6 {};
         test(6, initStateINDX6, initMemINDX6, finalStateINDX6, finalMemINDX6);
 
@@ -1512,108 +1524,108 @@ namespace NES
             {0x00AE, 0xBB}, {0x00AF, 0xCC},
             {0xCCBB, 0x03}
         };
-        cpuState finalStateINDX7 {0x0002, 0xFF, 0xFE, 0x04, 0x00, (ricoh2A03::carryFlag | ricoh2A03::negativeFlag)};
+        cpuState finalStateINDX7 {0x0002, 0xFF, 0xFE, 0x04, 0x00, ricoh2A03::negativeFlag};
         std::map<uint16_t, uint8_t> finalMemINDX7 {};
         test(6, initStateINDX7, initMemINDX7, finalStateINDX7, finalMemINDX7);
 
         // ZP
-        cpuState initStateZP {0x0000, 0xFF, 0x22, 0x00, 0x00, ricoh2A03::carryFlag};
+        cpuState initStateZP {0x0000, 0xFF, 0x22, 0x00, 0x00, 0x00};
         std::map<uint16_t, uint8_t> initMemZP {
             {0x0000, 0xE5}, {0x0001, 0xAA},
             {0x00AA, 0xEA}
         };
-        cpuState finalStateZP {0x0002, 0xFF, 0x38, 0x00, 0x00, ricoh2A03::carryFlag};
+        cpuState finalStateZP {0x0002, 0xFF, 0x37, 0x00, 0x00, 0x00};
         std::map<uint16_t, uint8_t> finalMemZP {};
         test(3, initStateZP, initMemZP, finalStateZP, finalMemZP);
 
         // IMM
-        cpuState initStateIMM {0x0000, 0xFF, 0x22, 0x00, 0x00, ricoh2A03::carryFlag};
+        cpuState initStateIMM {0x0000, 0xFF, 0x22, 0x00, 0x00, 0x00};
         std::map<uint16_t, uint8_t> initMemIMM {
             {0x0000, 0xE9}, {0x0001, 0xEA}
         };
-        cpuState finalStateIMM {0x0002, 0xFF, 0x38, 0x00, 0x00, ricoh2A03::carryFlag};
+        cpuState finalStateIMM {0x0002, 0xFF, 0x37, 0x00, 0x00, 0x00};
         std::map<uint16_t, uint8_t> finalMemIMM {};
         test(2, initStateIMM, initMemIMM, finalStateIMM, finalMemIMM);
 
         // ABS
-        cpuState initStateABS {0x0000, 0xFF, 0x22, 0x00, 0x00, ricoh2A03::carryFlag};
+        cpuState initStateABS {0x0000, 0xFF, 0x22, 0x00, 0x00, 0x00};
         std::map<uint16_t, uint8_t> initMemABS {
             {0x0000, 0xED}, {0x0001, 0xAA}, {0x0002, 0xBB},
             {0xBBAA, 0xEA}
         };
-        cpuState finalStateABS {0x0003, 0xFF, 0x38, 0x00, 0x00, ricoh2A03::carryFlag};
+        cpuState finalStateABS {0x0003, 0xFF, 0x37, 0x00, 0x00, 0x00};
         std::map<uint16_t, uint8_t> finalMemABS {};
         test(4, initStateABS, initMemABS, finalStateABS, finalMemABS);
 
         // INDY
-        cpuState initStateINDY {0x0000, 0xFF, 0x22, 0x00, 0x03, ricoh2A03::carryFlag};
+        cpuState initStateINDY {0x0000, 0xFF, 0x22, 0x00, 0x03, 0x00};
         std::map<uint16_t, uint8_t> initMemINDY {
             {0x0000, 0xF1}, {0x0001, 0xAA},
             {0x00AA, 0xBB}, {0x00AB, 0xCC},
             {0xCCBE, 0xEA}
         };
-        cpuState finalStateINDY {0x0002, 0xFF, 0x38, 0x00, 0x03, ricoh2A03::carryFlag};
+        cpuState finalStateINDY {0x0002, 0xFF, 0x37, 0x00, 0x03, 0x00};
         std::map<uint16_t, uint8_t> finalMemINDY {};
         test(5, initStateINDY, initMemINDY, finalStateINDY, finalMemINDY);
 
         // INDY (page cross delay +1)
-        cpuState initStateINDY2 {0x0000, 0xFF, 0x22, 0x00, 0x46, ricoh2A03::carryFlag};
+        cpuState initStateINDY2 {0x0000, 0xFF, 0x22, 0x00, 0x46, 0x00};
         std::map<uint16_t, uint8_t> initMemINDY2 {
             {0x0000, 0xF1}, {0x0001, 0xAA},
             {0x00AA, 0xBB}, {0x00AB, 0xCC},
             {0xCD01, 0xEA}
         };
-        cpuState finalStateINDY2 {0x0002, 0xFF, 0x38, 0x00, 0x46, ricoh2A03::carryFlag};
+        cpuState finalStateINDY2 {0x0002, 0xFF, 0x37, 0x00, 0x46, 0x00};
         std::map<uint16_t, uint8_t> finalMemINDY2 {};
         test(6, initStateINDY2, initMemINDY2, finalStateINDY2, finalMemINDY2);
 
         // ZPX (also checks for no page cross with indexing)
-        cpuState initStateZPX {0x0000, 0xFF, 0x22, 0x15, 0x00, ricoh2A03::carryFlag};
+        cpuState initStateZPX {0x0000, 0xFF, 0x22, 0x15, 0x00, 0x00};
         std::map<uint16_t, uint8_t> initMemZPX {
             {0x0000, 0xF5}, {0x0001, 0xFF},
             {0x0014, 0xEA}
         };
-        cpuState finalStateZPX {0x0002, 0xFF, 0x38, 0x15, 0x00, ricoh2A03::carryFlag};
+        cpuState finalStateZPX {0x0002, 0xFF, 0x37, 0x15, 0x00, 0x00};
         std::map<uint16_t, uint8_t> finalMemZPX {};
         test(4, initStateZPX, initMemZPX, finalStateZPX, finalMemZPX);
 
         // ABSY
-        cpuState initStateABSY {0x0000, 0xFF, 0x22, 0x00, 0x04, ricoh2A03::carryFlag};
+        cpuState initStateABSY {0x0000, 0xFF, 0x22, 0x00, 0x04, 0x00};
         std::map<uint16_t, uint8_t> initMemABSY {
             {0x0000, 0xF9}, {0x0001, 0xBB}, {0x0002, 0xAA},
             {0xAABF, 0xEA}
         };
-        cpuState finalStateABSY {0x0003, 0xFF, 0x38, 0x00, 0x04, ricoh2A03::carryFlag};
+        cpuState finalStateABSY {0x0003, 0xFF, 0x37, 0x00, 0x04, 0x00};
         std::map<uint16_t, uint8_t> finalMemABSY {};
         test(4, initStateABSY, initMemABSY, finalStateABSY, finalMemABSY);
 
         // ABSY (page cross delay +1)
-        cpuState initStateABSY2 {0x0000, 0xFF, 0x22, 0x00, 0x46, ricoh2A03::carryFlag};
+        cpuState initStateABSY2 {0x0000, 0xFF, 0x22, 0x00, 0x46, 0x00};
         std::map<uint16_t, uint8_t> initMemABSY2 {
             {0x0000, 0xF9}, {0x0001, 0xBB}, {0x0002, 0xAA},
             {0xAB01, 0xEA}
         };
-        cpuState finalStateABSY2 {0x0003, 0xFF, 0x38, 0x00, 0x46, ricoh2A03::carryFlag};
+        cpuState finalStateABSY2 {0x0003, 0xFF, 0x37, 0x00, 0x46, 0x00};
         std::map<uint16_t, uint8_t> finalMemABSY2 {};
         test(5, initStateABSY2, initMemABSY2, finalStateABSY2, finalMemABSY2);
 
         // ABSX
-        cpuState initStateABSX {0x0000, 0xFF, 0x22, 0x03, 0x00, ricoh2A03::carryFlag};
+        cpuState initStateABSX {0x0000, 0xFF, 0x22, 0x03, 0x00, 0x00};
         std::map<uint16_t, uint8_t> initMemABSX {
             {0x0000, 0xFD}, {0x0001, 0xAA}, {0x0002, 0xBB},
             {0xBBAD, 0xEA}
         };
-        cpuState finalStateABSX {0x0003, 0xFF, 0x38, 0x03, 0x00, ricoh2A03::carryFlag};
+        cpuState finalStateABSX {0x0003, 0xFF, 0x37, 0x03, 0x00, 0x00};
         std::map<uint16_t, uint8_t> finalMemABSX {};
         test(4, initStateABSX, initMemABSX, finalStateABSX, finalMemABSX);
 
         // ABSX (page cross delay +1)
-        cpuState initStateABSX2 {0x0000, 0xFF, 0x22, 0x64, 0x00, ricoh2A03::carryFlag};
+        cpuState initStateABSX2 {0x0000, 0xFF, 0x22, 0x64, 0x00, 0x00};
         std::map<uint16_t, uint8_t> initMemABSX2 {
             {0x0000, 0xFD}, {0x0001, 0xAA}, {0x0002, 0xBB},
             {0xBC0E, 0xEA}
         };
-        cpuState finalStateABSX2 {0x0003, 0xFF, 0x38, 0x64, 0x00, ricoh2A03::carryFlag};
+        cpuState finalStateABSX2 {0x0003, 0xFF, 0x37, 0x64, 0x00, 0x00};
         std::map<uint16_t, uint8_t> finalMemABSX2 {};
         test(5, initStateABSX2, initMemABSX2, finalStateABSX2, finalMemABSX2);
     }

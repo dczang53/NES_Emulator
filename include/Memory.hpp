@@ -22,17 +22,26 @@ namespace NES
         Memory(){};
         ~Memory(){};
 
+        virtual void initCartridge(std::string filename) = 0;
+
         virtual uint8_t cpuRead(uint16_t addr) = 0;
         virtual bool cpuWrite(uint16_t addr, uint8_t data) = 0;
 
         virtual uint8_t ppuRead(uint16_t addr) = 0;
         virtual bool ppuWrite(uint16_t addr, uint8_t data) = 0;
 
+        #ifdef DEBUG
+            virtual uint8_t cpuReadDebug(uint16_t addr) = 0;
+            virtual uint8_t ppuReadDebug(uint16_t addr) = 0;
+        #endif
+
         virtual void connectCPUandPPU(ricoh2A03::CPU *c, ricoh2C02::PPU *p) = 0;
 
         virtual uint8_t controllerRead(uint8_t player) = 0;
         virtual void controllerWrite(uint8_t player, uint8_t data) = 0;
 
+        virtual bool mapperIrqReq() = 0;
+        virtual void mapperIrqReset() = 0;
         virtual void toggleCpuCycle() = 0;
         virtual void ppuRequestDMA() = 0;
         virtual void finalizeDMAreq() = 0;
@@ -47,8 +56,10 @@ namespace NES
     class NESmemory : public Memory
     {
     public:
-        NESmemory(std::string filemame);
+        NESmemory();
         ~NESmemory();
+
+        void initCartridge(std::string filename);
 
         uint8_t cpuRead(uint16_t addr);
         bool cpuWrite(uint16_t addr, uint8_t data);
@@ -56,11 +67,18 @@ namespace NES
         uint8_t ppuRead(uint16_t addr);
         bool ppuWrite(uint16_t addr, uint8_t data);
 
+        #ifdef DEBUG
+            uint8_t cpuReadDebug(uint16_t addr);
+            uint8_t ppuReadDebug(uint16_t addr);
+        #endif
+
         void connectCPUandPPU(ricoh2A03::CPU *c, ricoh2C02::PPU *p);
 
         uint8_t controllerRead(uint8_t player);
         void controllerWrite(uint8_t player, uint8_t data);
 
+        bool mapperIrqReq();
+        void mapperIrqReset();
         void toggleCpuCycle();
         void ppuRequestDMA();
         void finalizeDMAreq();

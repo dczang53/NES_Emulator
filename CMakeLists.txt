@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.0.0)
 project(NES_Emulator VERSION 0.1.0)
 
-add_compile_options(-std=c++17)
+add_compile_options(-std=c++17 -g)
 
 include(CTest)
 enable_testing()
@@ -44,6 +44,11 @@ add_subdirectory(${CMAKE_CURRENT_BINARY_DIR}/googletest-src
 
 
 set(gtest false) # set to false to disable unit testing
+set(debug true)  # set to false to omit logging part of code
+
+if(debug)
+    add_compile_definitions(DEBUG)
+endif(debug)
 
 add_library(Cartridge SHARED include/Cartridge.hpp src/Cartridge.cpp)
 add_library(Mapper SHARED include/Mapper.hpp src/Mapper.cpp)

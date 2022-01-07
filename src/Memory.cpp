@@ -3,22 +3,27 @@
 #include "../include/Ricoh2A03.hpp"
 #include "../include/Ricoh2C02.hpp"
 
-NES::NESmemory::NESmemory(std::string filename)
+#include <iostream>
+
+NES::NESmemory::NESmemory()
 {
        cpuMemory = new uint8_t[0x401F]{0};
        // ppuMemory = new uint8_t[0x4000]{0};
        // set palette table to indices
        // palette stored in PPU
        ppuPalette = new uint8_t[0x001F]{0};
-       mapper = createMapper(filename);
 }
 
 NES::NESmemory::~NESmemory()
 {
        delete[] cpuMemory;
-       // delete[] ppuMemory;
        delete[] ppuPalette;
        delete mapper;
+}
+
+void NES::NESmemory::initCartridge(std::string filename)
+{
+       mapper = createMapper(filename, cpu);
 }
 
 uint8_t NES::NESmemory::cpuRead(uint16_t addr)
@@ -26,9 +31,13 @@ uint8_t NES::NESmemory::cpuRead(uint16_t addr)
     if (addr <= 0x1FFF)
         return cpuMemory[addr & 0x07FF];
     else if (addr <= 0x3FFF)        // remember to update PPU latch
-        return ppu->cpuRead(addr);  // return cpuMemory[(addr & 0x0007) + 0x2000]; // keep in mind these are PPU registers
+        return ppu->cpuRead(addr);
     else if (addr <= 0x4015)
+    {
+        if (addr == 0x4014)
+            return ppu->cpuRead(addr);
         return cpuMemory[addr];
+    }
     else if (addr <= 0x4017)        // controller serial read
     {
         uint8_t data = (cpuMemory[addr] & 0x80)? 1 : 0;
@@ -49,9 +58,7 @@ bool NES::NESmemory::cpuWrite(uint16_t addr, uint8_t data)
         return true;
     }
     else if (addr <= 0x3FFF)
-    {
         return ppu->cpuWrite(addr, data);
-    }
     else if (addr <= 0x401F)
     {
         if (addr == 0x4014)
@@ -101,12 +108,49 @@ bool NES::NESmemory::ppuWrite(uint16_t addr, uint8_t data)
     }
 }
 
+#ifdef DEBUG
+    uint8_t NES::NESmemory::cpuReadDebug(uint16_t addr)
+    {
+        if (addr <= 0x1FFF)
+            return cpuMemory[addr & 0x07FF];
+        else if (addr <= 0x3FFF)
+            return ppu->cpuReadDebug(addr);
+        else if (addr <= 0x4015)
+        {
+            if (addr == 0x4014)
+                return ppu->cpuReadDebug(addr);
+            return cpuMemory[addr];
+        }
+        else if (addr <= 0x4017)
+            return cpuMemory[addr];
+        else if (addr <= 0x401F)
+            return cpuMemory[addr];
+        else
+            return mapper->cpuReadDebug(addr);
+    }
+
+    uint8_t NES::NESmemory::ppuReadDebug(uint16_t addr)
+    {
+        addr &= 0x3FFF;
+        if (addr <= 0x1FFF)
+            return mapper->ppuReadDebug(addr);
+        else if (addr <= 0x3EFF)
+            return mapper->ppuReadDebug(addr & 0x2FFF);
+        else
+        {
+            addr &= 0x001F;
+            if ((addr & 0x0010) && !(addr & 0x0003))
+                addr &= ~(0x0010);
+            return ppuPalette[addr];
+        }
+    }
+#endif
+
 void NES::NESmemory::connectCPUandPPU(ricoh2A03::CPU *c, ricoh2C02::PPU *p)
 {
     cpu = c;
     ppu = p;
 }
-
 
 uint8_t NES::NESmemory::controllerRead(uint8_t player)
 {
@@ -125,12 +169,22 @@ void NES::NESmemory::controllerWrite(uint8_t player, uint8_t data)
 
 
 
+bool NES::NESmemory::mapperIrqReq()
+{
+    return mapper->IRQcheck();
+}
+
+void NES::NESmemory::mapperIrqReset()
+{
+    mapper->IRQreset();
+}
+
 void NES::NESmemory::toggleCpuCycle()
 {
     cpuOddCycle = !cpuOddCycle;
 }
 
-void NES::NESmemory::ppuRequestDMA()    // FORGOT TO CALL THIS; FIX
+void NES::NESmemory::ppuRequestDMA()
 {
     reqDMA = true;
 }
@@ -151,13 +205,10 @@ void NES::NESmemory::handleDMA()
 {
     if (DMAcycles > 0)
     {
-        if ((DMAcycles == 513) && cpuOddCycle)  // extra idle cycle for odd cpu cycles
+        if ((DMAcycles == 513) && cpuOddCycle)              // extra idle cycle for odd cpu cycles
             return;
-        if (DMAcycles < 513)                    // takes into account idle cycle at beginning
-        {
-            if (DMAcycles & 0x0001)             // write cycle
-                ppu->DMAtransfer();
-        }
+        if ((DMAcycles < 513) && (DMAcycles & 0x0001))      // takes into account idle cycle at beginning; also only happens on write cycles
+            ppu->DMAtransfer();
         DMAcycles--;
     }
 }

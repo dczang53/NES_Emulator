@@ -1,18 +1,51 @@
 #include "../include/Ricoh2A03.hpp"
 #include "../include/Memory.hpp"
 
-ricoh2A03::CPU::CPU(NES::Memory *m) : mem(m) {}
+// #include <iostream>
+// #include <cstring>
 
-ricoh2A03::CPU::~CPU(){}
+#ifdef DEBUG
+       #include <fstream>
+       #include <iomanip>
+#endif
 
-
-
-void ricoh2A03::CPU::tick()
+ricoh2A03::CPU::CPU(NES::Memory *m) : mem(m)
 {
+        #ifdef DEBUG
+              CPUlogfile = std::ofstream("CPUlogfile.txt", std::ios_base::out);  // debug
+              CPUlogfile << std::uppercase << std::hex << std::setfill('0');
+        #endif
+}
+
+ricoh2A03::CPU::~CPU()
+{
+       #ifdef DEBUG
+              CPUlogfile.close();
+       #endif
+}
+
+#ifdef DEBUG
+       void ricoh2A03::CPU::enableLog(bool enable)
+       {
+              CPUlog = enable;
+       }
+#endif
+
+
+
+void ricoh2A03::CPU::tick(bool functional)
+{
+       clock++;
+       if (!functional)
+              return;
        if (insClk <= 0)
        {
               if (pendingNMI)
               {
+                     #ifdef DEBUG
+                            if (CPUlog)                                             // debug
+                                   CPUlogfile << "(NMI triggered)";                 // debug
+                     #endif
                      mem->cpuWrite((0x0100 + SP), (uint8_t)((PC >> 8) & 0x00FF));
                      SP--;
                      mem->cpuWrite((0x0100 + SP), (uint8_t)(PC & 0x00FF));
@@ -24,6 +57,10 @@ void ricoh2A03::CPU::tick()
               }
               else if (pendingIRQ && !(STATUS & interruptDisable))
               {
+                     #ifdef DEBUG
+                            if (CPUlog)                                             // debug
+                                   CPUlogfile << "(IRQ triggered)";                 // debug
+                     #endif
                      mem->cpuWrite((0x0100 + SP), (uint8_t)((PC >> 8) & 0x00FF));
                      SP--;
                      mem->cpuWrite((0x0100 + SP), (uint8_t)(PC & 0x00FF));
@@ -36,11 +73,23 @@ void ricoh2A03::CPU::tick()
               }
               else
               {
+                     #ifdef DEBUG
+                            if (CPUlog)                                             // debug
+                                   CPUlogfile << PC;                                // debug
+                     #endif
                      currOp = &(instructionSet[mem->cpuRead(PC++)]);
+                     #ifdef DEBUG
+                            if (CPUlog)                                             // debug
+                                   CPUlogfile << ' ' << currOp->operation;          // debug
+                     #endif
                      operandClk = (this->*currOp->addrMode)();
                      processClk = (this->*currOp->operate)();
                      insClk = (currOp->cycles) + operandClk + processClk;
               }
+              #ifdef DEBUG
+                     if (CPUlog)                        // debug
+                            CPUlogfile << std::endl;    // debug
+              #endif
               pendingIRQ = false;
               pendingNMI = false;
        }
@@ -48,7 +97,10 @@ void ricoh2A03::CPU::tick()
 }
 
 
-
+uint64_t ricoh2A03::CPU::getClock()
+{
+       return clock;
+}
 
 
 void ricoh2A03::CPU::rst()
@@ -64,6 +116,7 @@ void ricoh2A03::CPU::rst()
        operandRef = nullptr;
        operandAddr = -1;
        insClk = 0;
+       clock = 0;
 }
 
 void ricoh2A03::CPU::irq()
@@ -96,6 +149,10 @@ uint8_t ricoh2A03::CPU::IMM()
 {
        operandRef = nullptr;
        operandAddr = PC++;
+       #ifdef DEBUG
+              if (CPUlog)
+                     CPUlogfile << " #$" << std::setw(2) << (int)(mem->cpuReadDebug(operandAddr));
+       #endif
        return 0;
 }
 
@@ -104,6 +161,10 @@ uint8_t ricoh2A03::CPU::ABS()
        operandRef = nullptr;
        operandAddr = (((uint16_t)(mem->cpuRead(PC + 1)) << 8) | mem->cpuRead(PC));
        PC += 2;
+       #ifdef DEBUG
+              if (CPUlog)
+                     CPUlogfile << " $" << std::setw(4) << (int)(operandAddr);
+       #endif
        return 0;
 }
 
@@ -111,6 +172,10 @@ uint8_t ricoh2A03::CPU::ZP()
 {
        operandRef = nullptr;
        operandAddr = (0x0000 | mem->cpuRead(PC++));
+       #ifdef DEBUG
+              if (CPUlog)
+                     CPUlogfile << " $" << std::setw(2) << (int)(operandAddr);
+       #endif
        return 0;
 }
 
@@ -118,6 +183,10 @@ uint8_t ricoh2A03::CPU::ZPX()
 {
        operandRef = nullptr;
        operandAddr = (0x00FF & (mem->cpuRead(PC++) + REGX));
+       #ifdef DEBUG
+              if (CPUlog)
+                     CPUlogfile << " $" << std::setw(2) << (int)(operandAddr - REGX) << ",X";
+       #endif
        return 0;
 }
 
@@ -125,6 +194,10 @@ uint8_t ricoh2A03::CPU::ZPY()
 {
        operandRef = nullptr;
        operandAddr = (0x00FF & (mem->cpuRead(PC++) + REGY));
+       #ifdef DEBUG
+              if (CPUlog)
+                     CPUlogfile << " $" << std::setw(2) << (int)(operandAddr - REGY) << ",Y";
+       #endif
        return 0;
 }
 
@@ -134,6 +207,10 @@ uint8_t ricoh2A03::CPU::ABSX()
        PC += 2;
        operandRef = nullptr;
        operandAddr = buffer + REGX;
+       #ifdef DEBUG
+              if (CPUlog)
+                     CPUlogfile << " $" << std::setw(4) << (int)(buffer) << ",X";
+       #endif
        if ((operandAddr & 0xFF00) == (buffer & 0xFF00))
               return 0;
        else
@@ -146,6 +223,10 @@ uint8_t ricoh2A03::CPU::ABSY()
        PC += 2;
        operandRef = nullptr;
        operandAddr = buffer + REGY;
+       #ifdef DEBUG
+              if (CPUlog)
+                     CPUlogfile << " $" << std::setw(4) << (int)(buffer) << ",Y";
+       #endif
        if ((operandAddr & 0xFF00) == (buffer & 0xFF00))
               return 0;
        else
@@ -163,14 +244,23 @@ uint8_t ricoh2A03::CPU::REL()
 {
        operandRef = nullptr;
        operandAddr = PC++;
+       #ifdef DEBUG
+              if (CPUlog)
+                     CPUlogfile << ' ' << std::setw(2) << (int)(mem->cpuReadDebug(operandAddr)) << ",Y";
+       #endif
        return 0;
 }
 
 uint8_t ricoh2A03::CPU::INDX()
 {
-       uint8_t zpAddr = mem->cpuRead(PC++) + REGX;
+       uint8_t temp = mem->cpuRead(PC++);
+       uint8_t zpAddr = temp + REGX;
        operandRef = nullptr;
-       operandAddr = (((uint16_t)(mem->cpuRead(zpAddr + 1)) << 8) | mem->cpuRead(zpAddr));
+       operandAddr = (((uint16_t)(mem->cpuRead(zpAddr + 1)) << 8) | mem->cpuRead(zpAddr)) & 0x000000FF;
+       #ifdef DEBUG
+              if (CPUlog)
+                     CPUlogfile << " ($" << std::setw(2) << (int)(temp) << ",X)";
+       #endif
        return 0;
 }
 
@@ -180,6 +270,10 @@ uint8_t ricoh2A03::CPU::INDY()
        uint16_t buffer = (((uint16_t)(mem->cpuRead((uint16_t)(zpAddr) + 1)) << 8) | mem->cpuRead(zpAddr));
        operandRef = nullptr;
        operandAddr = buffer + REGY;
+       #ifdef DEBUG
+              if (CPUlog)
+                     CPUlogfile << " ($" << std::setw(2) << (int)(zpAddr) << "),Y";
+       #endif
        if((operandAddr & 0xFF00) == (buffer & 0xFF00))
               return 0;
        else
@@ -195,6 +289,10 @@ uint8_t ricoh2A03::CPU::IND()
        else
               operandAddr = (((uint16_t)(mem->cpuRead(addrToAddr + 1)) << 8) | mem->cpuRead(addrToAddr));
        PC += 2;
+       #ifdef DEBUG
+              if (CPUlog)
+                     CPUlogfile << " ($" << std::setw(4) << (int)(addrToAddr) << ")";
+       #endif
        return 0;
 }
 
@@ -308,7 +406,7 @@ uint8_t ricoh2A03::CPU::PHA()
 
 uint8_t ricoh2A03::CPU::PHP()
 {
-       mem->cpuWrite(0x0100 + SP, STATUS);
+       mem->cpuWrite(0x0100 + SP, (STATUS | breakCommand | unused));
        SP--;
        return 0;
 }
@@ -377,8 +475,8 @@ uint8_t ricoh2A03::CPU::ADC()
 uint8_t ricoh2A03::CPU::SBC()
 {
        uint8_t operand = (operandRef)? *operandRef : mem->cpuRead(operandAddr);
-       uint16_t buffer = (uint16_t)(ACC) + (uint16_t)(operand ^ 0x00FF) + (uint16_t)((STATUS & carryFlag)? 1 : 0);
-       STATUS = (buffer & 0xFF00)? (STATUS & ~(carryFlag)) : (STATUS | carryFlag);
+       uint16_t buffer = (uint16_t)(ACC) + (uint16_t)(operand ^ 0xFF) + (uint16_t)((STATUS & carryFlag)? 1 : 0);       // carryFlag is "reverse-carry" here
+       STATUS = (buffer & 0xFF00)? (STATUS | carryFlag) : (STATUS & ~(carryFlag));
        STATUS = (buffer & 0x00FF)? (STATUS & ~(zeroFlag)) : (STATUS | zeroFlag);
        STATUS = (((uint16_t)(ACC) ^ (uint16_t)(operand)) & ((uint16_t)(ACC) ^ buffer) & 0x0080)? (STATUS | overflowFlag) : (STATUS & ~(overflowFlag));
        STATUS = (buffer & 0x0080)? (STATUS | negativeFlag) : (STATUS & ~(negativeFlag));
@@ -761,6 +859,10 @@ uint8_t ricoh2A03::CPU::RTI()
        PC = (0x0000 | mem->cpuRead(0x0100 + SP));
        SP++;
        PC |= ((uint16_t)(mem->cpuRead(0x0100 + SP)) << 8);
+       #ifdef DEBUG
+              if (CPUlog)                               // debug
+                     CPUlogfile << " (RTI here)";       // debug
+       #endif
        return 0;
 }
 

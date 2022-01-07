@@ -17,7 +17,7 @@ namespace ricoh2C02
         spritePatternTable8x8Addr = ((uint8_t)(1) << 3),
         backgroundPatternTable =    ((uint8_t)(1) << 4),
         spriteSize =                ((uint8_t)(1) << 5),
-        ppuMasterSlave =            ((uint8_t)(1) << 6),
+        ppuMasterSlave =            ((uint8_t)(1) << 6),    // unused
         vblankInterval =            ((uint8_t)(1) << 7)
     };
 
@@ -77,6 +77,9 @@ namespace ricoh2C02
 
         uint8_t cpuRead(uint16_t addr);             // reading & writing to PPU registers alter PPU state
         bool cpuWrite(uint16_t addr, uint8_t data);
+        #ifdef DEBUG
+            uint8_t cpuReadDebug(uint16_t addr);        // reading & writing to PPU registers WITHOUT altering PPU state (debugging)
+        #endif
 
         bool DMAtransfer(); // for DMA transfer
 
@@ -86,9 +89,11 @@ namespace ricoh2C02
 
         bool triggerNMI();
 
-        // debugging; remove later
-        uint8_t *chr;
-        uint8_t* const getChrROM();
+        #ifdef DEBUG
+            uint8_t* const getChrROM();
+            uint8_t* const getOAM();
+            uint8_t* const getNT();
+        #endif
 
     private:
         NES::Memory *mem;
@@ -100,9 +105,9 @@ namespace ricoh2C02
         bool NMI = false;
 
         // PPU registers and helper variables
-        uint8_t registers[9] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-        uint16_t PPUCTRLpost30000 = 0x0000;     // counter for PPUCTRL writes as writes are ignored first 30000 cycles
-        uint8_t PPUDATAbuffer = 0x00;           // potential 2-cycle buffered read for PPUDATA
+        uint8_t registers[9] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};  // see Ricoh2C02.cpp for details
+        uint16_t PPUCTRLpost30000 = 0x0000;                                             // counter for PPUCTRL writes as writes are ignored first 30000 cycles
+        uint8_t PPUDATAbuffer = 0x00;                                                   // potential 2-cycle buffered read for PPUDATA
 
         // PPU pixel rendering loop position variables
         uint16_t screenX = 0, screenY = 261;    // 341 x 262 clock cycles
@@ -112,8 +117,10 @@ namespace ricoh2C02
         // PPU scrolling internal register behavior: https://wiki.nesdev.com/w/index.php/PPU_scrolling
 
         // internal background registers
+        ///*
         uint16_t vramAddrCurr = 0x0000;     // (v) current VRAM address
         uint16_t vramAddrTemp = 0x0000;     // (t) temporary VRAM address; can also be thought of as the address of the top left onscreen tile
+        //*/
         uint8_t fineX = 0x00;               // (x) horizontal sprite-level scrolling (3 bits with values 0-7)
         bool writeToggle = false;           // (w) 2-byte write for PPUSCROLL and APPUADDR
         uint8_t bgPalette1shifter = 0x00, bgPalette0shifter = 0x00;
@@ -148,6 +155,12 @@ namespace ricoh2C02
         uint8_t sprToRender = 0;            // number of sprites buffered to write in a scanline
         bool nxtRenderSprite0 = false;      // buffered value for below as we check this the scanline before
         bool renderSprite0 = false;         // to check for sprite 0 in secondary OAM
+
+        // helper variables to calculate sprite address in CHR ROM when preloading shifters (literally just for cycles 257-320)
+        uint8_t currSpriteinOAM2 = 0x00;
+        uint16_t patTableAddr = 0x0000;
+        uint16_t tileID = 0x00;
+        uint8_t tileRow = 0x00;
 
         /*
         // Sprite representation (http://wiki.nesdev.com/w/index.php/PPU_OAM)
@@ -251,6 +264,12 @@ namespace ricoh2C02
             {0, 0, 0},
             {0, 0, 0}
         };
+
+        #ifdef DEBUG
+            uint8_t *chr;
+            uint8_t *oam;
+            uint8_t *nt;
+        #endif
     };
 }
 
@@ -319,7 +338,7 @@ namespace ricoh2C02
 */
 
 /*
-// BACKGROUND RENDERING EXAMPLE: (data follows this pipeline, but buffered)
+// BACKGROUND RENDERING EXAMPLE: (data follows this pipeline, but buffered in multiple steps)
     // READ BYTE FROM NAME TABLE FOR SPRITE ID
         // SPRITE_ID = (0x2000 + (0x0400 * NT_ID) + ((coarseY * 32) + coarseX))
     // READ BYTE FROM ATTRIBUTE TABLE FOR PALETTE ID, AND EXTRACT 2 BITS

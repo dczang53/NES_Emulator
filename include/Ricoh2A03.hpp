@@ -3,6 +3,10 @@
 
 #include <cstdint>
 
+#ifdef DEBUG
+    #include <fstream>
+#endif
+
 namespace NES
 {
     class Memory;
@@ -17,6 +21,7 @@ namespace ricoh2A03
         interruptDisable =  ((uint8_t)(1) << 2),
         decimalMode =       ((uint8_t)(1) << 3),
         breakCommand =      ((uint8_t)(1) << 4),
+        unused =            ((uint8_t)(1) << 5),
         overflowFlag =      ((uint8_t)(1) << 6),
         negativeFlag =      ((uint8_t)(1) << 7)
     };
@@ -45,7 +50,9 @@ namespace ricoh2A03
         uint8_t STATUS = 0x00;  // processor status register
 
         // clock function to call for one clock cycle
-        void tick();
+        void tick(bool functional);
+
+        uint64_t getClock();
 
         // interrupt functions
         void rst();
@@ -54,6 +61,10 @@ namespace ricoh2A03
 
         // extra function to see if current instruction is done (UNUSED; remove this)
         bool instrDone();
+
+        #ifdef DEBUG
+            void enableLog(bool enable);    // debug
+        #endif
 
     private:
         // memory interface for addresses up to 2^16
@@ -76,6 +87,13 @@ namespace ricoh2A03
         // private buffer variables used by addressing mode and instruction functions
         uint8_t *operandRef = nullptr;  // set to pointer to CPU internal register
         int32_t operandAddr = -1;       // else set to address of operand
+
+        uint64_t clock = 0;
+
+        #ifdef DEBUG
+            std::ofstream CPUlogfile;   // debug
+            bool CPUlog = false;        // debug
+        #endif
 
         // all addressing modes (http://www.obelisk.me.uk/6502/addressing.html) (http://archive.6502.org/datasheets/rockwell_r650x_r651x.pdf)
         uint8_t ACCUM();   // accumulator addressing

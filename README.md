@@ -34,9 +34,25 @@ So far, emulator presumably works for any cartridge using Mapper 0 (tested with 
 
 * PAUSE: 'P'
   
+
+### *Tested Games*:
+* Castlevania
+* Dragon Quest
+* Donkey Kong
+* Donkey Kong 3
+* Duck Hunt
+* DuckTales
+* Ice Climber
+* Legend of Zelda
+* Mega Man
+* Pac-Man
+* Super Mario Bros
+* Tetris
+
 ### *TODO*:
 
-* Implementing mappers 1-4  
+* Implementing mapper 4 (in progress)  
+* some CPU opcode  present (testing using nestest.nes from nesdev.org)
 * Implementing Audio  
 * Testing compilation on Windows (already tested for Linux)  
   
