@@ -7,8 +7,7 @@ So far, emulator presumably works for any cartridge using Mapper 0 (tested with 
 * Install CMake
 * Download SDL2
 * Run CMake and build
-* Place ROM file inside of "ROM" folder in build directory
-* Run "./NES_Emulator <ROM_name\>"
+* Run "./NES_Emulator <ROM_path\>"
   
 ### *Controls*:
 
