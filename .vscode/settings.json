@@ -70,6 +70,7 @@
         "hash_map": "cpp",
         "hash_set": "cpp",
         "numbers": "cpp",
-        "semaphore": "cpp"
+        "semaphore": "cpp",
+        "bitset": "cpp"
     }
 }

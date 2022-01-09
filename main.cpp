@@ -24,11 +24,12 @@ int main(int argc, char **argv)
     #else
         std::string ROMfile;
         if (argc != 2)
-            ROMfile = std::string("Mapper0/nestest.nes");    // super mario bros 3 bug no IRQ at menu screen?
-            // return 0;
+        {
+            std::cout << "enter file path to .nes cartridge file" << std::endl << "exiting" << std::endl;
+            return 0;
+        }
         else
             ROMfile = std::string(argv[1]);
-        ROMfile = "ROM/" + ROMfile;
         NES::Memory *memory = new NES::NESmemory();
         ricoh2A03::CPU cpu(memory);
         ricoh2C02::PPU ppu(memory);
@@ -70,7 +71,6 @@ int main(int argc, char **argv)
                     }
                     if (memory->mapperIrqReq())
                     {
-                        std::cout << "CPU IRQ request" << std::endl;
                         cpu.irq();
                         memory->mapperIrqReset();
                     }

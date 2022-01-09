@@ -125,7 +125,7 @@ ricoh2C02::PPU::~PPU()
         return oam;
     }
 
-    uint8_t* const ricoh2C02::PPU::getNT()      // TODO: some segmentation fault BS here; find it later
+    uint8_t* const ricoh2C02::PPU::getNT()
     {
         memset(nt, 0x00, 256 * 240 * 4 * 3 * sizeof(uint8_t));
         for (uint16_t ntNum = 0; ntNum < 4; ntNum++)
@@ -362,10 +362,6 @@ bool ricoh2C02::PPU::DMAtransfer()
 // (dunno if above is 100% true, but done just to get mapper 4 to work)
 void ricoh2C02::PPU::tick()
 {
-    /*
-    if (screenX == 260)
-        std::cout << "{" << (int)(screenY) << ", " << (int)(screenX) << "}" << std::endl;
-    */
     // -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     // background here
     // -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -379,9 +375,6 @@ void ricoh2C02::PPU::tick()
     }
     if ((screenY <= 239) || (screenY == 261))   // for visible scanlines
     {
-        ///*
-        // if ((screenX == 0) || ((screenY == 0) && oddFrame && (screenX == 1)))
-        //     bgNextTileID = mem->ppuRead(0x2000 | (vramAddrCurr & 0x0FFF));
         if (((screenX >= 0) && (screenX <= 256)) || ((screenX >= 320) && (screenX <= 336)))
         {
             if ((screenX) && (screenX != 320))
@@ -435,55 +428,6 @@ void ricoh2C02::PPU::tick()
                     break;
             }
         }
-        //*/
-        /*
-        if (((screenX >= 1) && (screenX <= 256)) || ((screenX >= 321) && (screenX <= 336)))
-        {
-            bgPalette1shifter = (bgPalette1shifter << 1) | ((bgPalette1Latch)? 0x01 : 0x00);
-            bgPalette0shifter = (bgPalette0shifter << 1) | ((bgPalette0Latch)? 0x01 : 0x00);
-            bgMSBshifter <<= 1;
-            bgLSBshifter <<= 1;
-            switch (screenX & 0x0007)       // preloading data for next tile / 8 pixels
-            {                               // note each ppuRead case is 1 cycle early as address line seems to be set before actual read occurs?
-                case 1:
-                    bgPalette1Latch = (bgNextTileAttr & 0x02)? true : false;
-                    bgPalette0Latch = (bgNextTileAttr & 0x01)? true : false;
-                    bgMSBshifter |= bgNextMSB;
-                    bgLSBshifter |= bgNextLSB;
-                case 2:
-                    if ((screenY == 261) && (screenX == 1)) // clear vblank, sprite 0, and overflow flags
-                        registers[2] &= ~(PPUSTATUSmask::sprite0HitFlag | PPUSTATUSmask::spriteOverflowFlag | PPUSTATUSmask::vblankFlag);
-                    // get next tile sprite ID
-                    bgNextTileID = mem->ppuRead(0x2000 | (vramAddrCurr & 0x0FFF));
-                    break;
-                case 4:
-                    // AT byte
-                    bgNextTileAttr = mem->ppuRead(0x23C0 | (vramAddrCurr & VRAMmask::nametableID)
-                                                         | (((vramAddrCurr & VRAMmask::coarseY) >> 4) & 0x0038)     // >> 5 >> 2 << 3
-                                                         | ((vramAddrCurr & VRAMmask::coarseX) >> 2));
-                    if (vramAddrCurr & VRAMmask::coarseY & 0x0040)
-                        bgNextTileAttr >>= 4;
-                    if (vramAddrCurr & VRAMmask::coarseX & 0x0002)
-                        bgNextTileAttr >>= 2;
-                    break;
-                case 6:
-                    // get next tile LSB
-                    bgNextLSB = mem->ppuRead(((registers[0] & PPUCTRLmask::backgroundPatternTable)? 0x1000 : 0x0000)
-                                             + (bgNextTileID << 4)
-                                             + ((vramAddrCurr & VRAMmask::fineY) >> 12));
-                    break;
-                case 0:
-                    // get next tile MSB
-                    bgNextMSB = mem->ppuRead(((registers[0] & PPUCTRLmask::backgroundPatternTable)? 0x1000 : 0x0000)
-                                             + (bgNextTileID << 4)
-                                             + ((vramAddrCurr & VRAMmask::fineY) >> 12)
-                                             + 8);
-                    break;
-                default:
-                    break;
-            }
-        }
-        */
         else if (screenX == 257)
         {
             bgPalette1Latch = (bgNextTileAttr & 0x02)? true : false;
@@ -581,7 +525,6 @@ void ricoh2C02::PPU::tick()
                 }
             }
         }
-        ///*
         else if ((screenX >= 257) && (screenX <= 320))  // load data from secondary OAM into shifters?
         {                                               // 64 ppu clock cycles (8 cycles per entry in secondary OAM) (not completely accurate; just assumed ppuRead occurs every 4 ppu cycles)
             if (screenX == 257)
@@ -595,8 +538,6 @@ void ricoh2C02::PPU::tick()
                 switch (screenX & 0x0007)
                 {
                     case 1:
-                        patTableAddr = 0x0000;
-                        tileID = 0x00;
                         tileRow = (uint8_t)((screenY == 261)? 0 : (screenY + 1)) - OAMsecondary[currSpriteinOAM2 * 4];
                         if (registers[0] & PPUCTRLmask::spriteSize) // 8x16 sprite mode
                         {
@@ -644,58 +585,22 @@ void ricoh2C02::PPU::tick()
                         break;
                 }
             }
-
-        }
-        //*/
-        /*
-        else if (screenX >= 257)
-        {
-            sprToRender = nxtSprToRender;
-            renderSprite0 = nxtRenderSprite0;
-            for (uint8_t i = 0; i < nxtSprToRender; i++)
-            {
-                uint16_t patTableAddr = 0x0000;
-                uint16_t tileID = 0x00;
-                uint8_t tileRow = (uint8_t)((screenY == 261)? 0 : (screenY + 1)) - OAMsecondary[i * 4];
-                if (registers[0] & PPUCTRLmask::spriteSize) // 8x16 sprite mode
+            else    // edge case: is there is no sprite to load, scanline counting for Mapper 4 fails
+            {       // ("dirty" trick to get Mapper 4 to work) (address line A12 actively in use even when no sprites are to be rendered next frame) (so, we use dummy writes to mimic this)
+                switch(screenX & 0x0007)
                 {
-                    patTableAddr = ((OAMsecondary[(i * 4) + 1] & OAMmask::byte1Bank)? 0x1000 : 0x0000);
-                    tileID = OAMsecondary[(i * 4) + 1] & OAMmask::byte1TileID;
-                    if (OAMsecondary[(i * 4) + 2] & OAMmask::byte2FlipVert)     // flip sprite veritcally
-                        tileRow = 15 - tileRow;
-                    if (tileRow >= 8)
-                    {
-                        tileRow -= 8;
-                        tileID++;
-                    }
+                    case 0:
+                    case 4:
+                        if (registers[0] & PPUCTRLmask::spriteSize) // 8x8 sprite mode
+                            mem->ppuRead(0x1FF0);   // see "https://wiki.nesdev.org/w/index.php?title=MMC3#IRQ_Specifics"? (not 100% correct. but close enough)
+                        else
+                            mem->ppuRead((registers[0] & PPUCTRLmask::spritePatternTable8x8Addr)? 0x1000 : 0x0000);
+                        break;
+                    default:
+                        break;
                 }
-                else    // 8x8 sprite mode
-                {
-                    patTableAddr = (registers[0] & PPUCTRLmask::spritePatternTable8x8Addr)? 0x1000 : 0x0000;
-                    tileID = OAMsecondary[(i * 4) + 1];
-                    if (OAMsecondary[(i * 4) + 2] & OAMmask::byte2FlipVert)     // flip sprite vertically
-                        tileRow = 7 - tileRow;
-                }
-                sprLSBshifter[i] = mem->ppuRead(patTableAddr + (tileID << 4) + tileRow);
-                sprMSBshifter[i] = mem->ppuRead(patTableAddr + (tileID << 4) + tileRow + 8);
-                if (OAMsecondary[(i * 4) + 2] & OAMmask::byte2FlipHoriz)        // flip sprite horizontally
-                {
-                    uint8_t toFlip = sprLSBshifter[i];
-                    toFlip = (toFlip & 0xF0) >> 4 | (toFlip & 0x0F) << 4;
-                    toFlip = (toFlip & 0xCC) >> 2 | (toFlip & 0x33) << 2;
-                    toFlip = (toFlip & 0xAA) >> 1 | (toFlip & 0x55) << 1;
-                    sprLSBshifter[i] = toFlip;
-                    toFlip = sprMSBshifter[i];
-                    toFlip = (toFlip & 0xF0) >> 4 | (toFlip & 0x0F) << 4;
-                    toFlip = (toFlip & 0xCC) >> 2 | (toFlip & 0x33) << 2;
-                    toFlip = (toFlip & 0xAA) >> 1 | (toFlip & 0x55) << 1;
-                    sprMSBshifter[i] = toFlip;
-                }
-                sprAttrLatch[i] = OAMsecondary[(i * 4) + 2];
-                sprPosX[i] = OAMsecondary[(i * 4) + 3];
             }
         }
-        */
     }
 
     // -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

@@ -36,6 +36,7 @@ namespace NES
         virtual uint8_t ppuRead(uint16_t addr) = 0;
         virtual bool ppuWrite(uint16_t addr, uint8_t data) = 0;
 
+        // memory-neutral reading for logging and debugging (no modifying cpu/ppu registers on read)
         #ifdef DEBUG
             virtual uint8_t cpuReadDebug(uint16_t addr) = 0;
             virtual uint8_t ppuReadDebug(uint16_t addr) = 0;
@@ -151,7 +152,6 @@ namespace NES
         uint8_t ppuRead(uint16_t addr);
         bool ppuWrite(uint16_t addr, uint8_t data);
 
-        // memory-neutral reading for logging and debugging (no modifying cpu/ppu registers on read)
         #ifdef DEBUG
             uint8_t cpuReadDebug(uint16_t addr);
             uint8_t ppuReadDebug(uint16_t addr);

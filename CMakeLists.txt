@@ -44,7 +44,7 @@ add_subdirectory(${CMAKE_CURRENT_BINARY_DIR}/googletest-src
 
 
 set(gtest false) # set to false to disable unit testing
-set(debug true)  # set to false to omit logging part of code
+set(debug false)  # set to false to omit logging part of code
 
 if(debug)
     add_compile_definitions(DEBUG)

@@ -1,7 +1,8 @@
 #include "../include/Ricoh2A03.hpp"
 #include "../include/Memory.hpp"
 
-// #include <iostream>
+#include <iostream>
+#include <bitset>
 // #include <cstring>
 
 #ifdef DEBUG
@@ -13,7 +14,7 @@ ricoh2A03::CPU::CPU(NES::Memory *m) : mem(m)
 {
         #ifdef DEBUG
               CPUlogfile = std::ofstream("CPUlogfile.txt", std::ios_base::out);  // debug
-              CPUlogfile << std::uppercase << std::hex << std::setfill('0');
+              CPUlogfile << std::uppercase << std::hex << std::setfill('0');     // debug
         #endif
 }
 
@@ -256,7 +257,7 @@ uint8_t ricoh2A03::CPU::INDX()
        uint8_t temp = mem->cpuRead(PC++);
        uint8_t zpAddr = temp + REGX;
        operandRef = nullptr;
-       operandAddr = (((uint16_t)(mem->cpuRead(zpAddr + 1)) << 8) | mem->cpuRead(zpAddr)) & 0x000000FF;
+       operandAddr = (((uint16_t)(mem->cpuRead((zpAddr + 1) & 0x00FF)) << 8) | mem->cpuRead(zpAddr));
        #ifdef DEBUG
               if (CPUlog)
                      CPUlogfile << " ($" << std::setw(2) << (int)(temp) << ",X)";
@@ -267,7 +268,7 @@ uint8_t ricoh2A03::CPU::INDX()
 uint8_t ricoh2A03::CPU::INDY()
 {
        uint8_t zpAddr = mem->cpuRead(PC++);
-       uint16_t buffer = (((uint16_t)(mem->cpuRead((uint16_t)(zpAddr) + 1)) << 8) | mem->cpuRead(zpAddr));
+       uint16_t buffer = (((uint16_t)(mem->cpuRead((zpAddr + 1) & 0x00FF)) << 8) | mem->cpuRead(zpAddr));
        operandRef = nullptr;
        operandAddr = buffer + REGY;
        #ifdef DEBUG

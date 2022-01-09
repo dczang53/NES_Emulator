@@ -624,7 +624,10 @@ bool NES::Mapper4::cpuWrite(uint16_t addr, uint8_t data)
                 return true;
             case 2:     // 0xC000
                 if (addr & 0x0001)
+                {
                     irqCounter = 0;
+                    // std::cout << "irqReload" << std::endl;
+                }
                 else
                     regIrqLatch = data;
                 return true;
@@ -703,7 +706,7 @@ uint8_t NES::Mapper4::ppuRead(uint16_t addr)
 
 bool NES::Mapper4::ppuWrite(uint16_t addr, uint8_t data)
 {
-    // updateIrqCounter(addr);
+    updateIrqCounter(addr);
     if ((addr <= 0x1FFF) && !(cart->nChrROM))       // CHR-RAM functionality; see "https://wiki.nesdev.com/w/index.php/Category:Mappers_with_CHR_RAM"
     {
         if (regBankSelect & 0x80)
