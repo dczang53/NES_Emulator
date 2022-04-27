@@ -91,28 +91,11 @@ if(gtest)
     add_compile_definitions(GTEST)
 endif(gtest)
 
-#[[
-target_link_libraries(Mapper PRIVATE Cartridge Memory RICOH2A03)
-target_link_libraries(Memory PRIVATE Mapper RICOH2A03 RICOH2C02)
-target_link_libraries(RICOH2A03 PRIVATE Memory)
-target_link_libraries(RICOH2C02 PRIVATE Memory)
-target_link_libraries(IO PRIVATE Memory SDL2::SDL2)
-# target_link_libraries(IO PRIVATE SDL2::SDL2)
-]]
 
 
 if(MSVC)
     set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS TRUE)
 endif()
-
-
-#[[
-target_link_libraries(Mapper Cartridge Memory RICOH2A03)
-target_link_libraries(Memory Mapper RICOH2A03 RICOH2C02)
-target_link_libraries(RICOH2A03 Memory)
-target_link_libraries(RICOH2C02 Memory)
-target_link_libraries(IO Memory SDL2::SDL2)
-]]
 
 target_link_libraries(Mapper INTERFACE Cartridge)
 target_link_libraries(Mapper PUBLIC Memory RICOH2A03)
