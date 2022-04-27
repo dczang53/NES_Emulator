@@ -9,6 +9,9 @@
 
 #ifdef GTEST
     #include "testModules/gtestModules.hpp"
+#elif defined(_WIN32) || defined(__WIN32__) || defined(WIN32) || defined(_WIN64)
+    #define SDL_MAIN_HANDLED
+    #include "SDL.h"
 #else
     #include "SDL2/SDL.h"
 #endif
