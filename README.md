@@ -1,7 +1,6 @@
 # NES_Emulator  
 ---
 An amateur attempt at writing a simple emulator in C++ for the Nintendo Entertainment System (NES).  
-So far, emulator presumably works for any cartridge using Mapper 0 (tested with Donkey Kong).
   
 ### *Building and Running*:
 * Install CMake
@@ -53,7 +52,7 @@ So far, emulator presumably works for any cartridge using Mapper 0 (tested with 
 ### *TODO*:
 
 * Implementing Audio  
-* Testing compilation on Windows and Mac (already tested for Linux)  
+* Testing compilation on Mac (already tested for Linux and Windows MinGW)  
   
 ### *Further Optimizations to Consider*:
 
