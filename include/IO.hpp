@@ -8,6 +8,9 @@
     #include "SDL2/SDL.h"
 #endif
 
+#define AUDIO_LATENCY_SAMPLES   (44100 / 20)    // 1/20 second of latency -> 1/20 * 44100 samples of latency
+#define AUDIO_FRAME_SAMPLES     1024
+
 #include <cstdint>
 
 namespace NES
@@ -29,6 +32,13 @@ namespace NES
         #endif
         
         void updateInputs(bool *quit, bool *pause, bool *log);
+        
+        void audioAddSample(uint8_t sample);
+        void audioPause(bool p);
+
+        static void audioCallback(void* userdata, uint8_t* stream, int len);
+
+        int audioSampleRate();
 
     private:
         Memory *mem;
@@ -36,6 +46,10 @@ namespace NES
         SDL_Window *window0;
         SDL_Renderer *renderer0;
         SDL_Texture *texture0;
+
+        // APU
+        SDL_AudioSpec audioTarget, audioHave;
+        SDL_AudioDeviceID audioHandler;
 
         #ifdef DEBUG
             SDL_Window *window1;
@@ -52,6 +66,15 @@ namespace NES
         #endif
 
         SDL_Event event;
+        
+        // SDL sound callback data (circular buffer)
+        inline static uint8_t soundBuffer[AUDIO_LATENCY_SAMPLES * 2] = {0};     // sound buffer
+        inline static int32_t soundBufferIndex = 0;                             // position of buffer write position
+        inline static int32_t soundBufferStart = 0;
+        inline static bool soundBufferLoop = false;
+
+        inline static bool audioPaused = true;              // explicit pause from game loop
+        inline static bool audioPlaybackPaused = true;      // brief pause from not enough samples in sound buffer
     };
 }
 

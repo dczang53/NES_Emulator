@@ -1,11 +1,15 @@
 #include "../include/IO.hpp"
 #include "../include/Memory.hpp"
+#include <cstring>
 
-
+#include <iostream>
 
 NES::IO::IO(NES::Memory *m) : mem(m)
 {
-    SDL_Init(SDL_INIT_VIDEO);
+    if((SDL_Init(SDL_INIT_VIDEO|SDL_INIT_AUDIO) == -1))
+    { 
+        std::cout << "Error initializing SDL: " << SDL_GetError() << std::endl;
+    }
     window0 = SDL_CreateWindow("NES Emulation", 0, SDL_WINDOWPOS_UNDEFINED, 512, 480, SDL_WINDOW_RESIZABLE);
     renderer0 = SDL_CreateRenderer(window0, -1, 0);
     texture0 = SDL_CreateTexture(renderer0, SDL_PIXELFORMAT_RGB24, SDL_TEXTUREACCESS_STATIC, 256, 240);
@@ -25,6 +29,20 @@ NES::IO::IO(NES::Memory *m) : mem(m)
         texture3 = SDL_CreateTexture(renderer3, SDL_PIXELFORMAT_RGB24, SDL_TEXTUREACCESS_STATIC, 512, 480);
         SDL_SetWindowTitle(window3, "NT");
     #endif
+    
+    audioTarget.freq = 44100;                               // # of sample frames per second
+    audioTarget.format = AUDIO_U8;
+    audioTarget.channels = 1;                               // mono
+    audioTarget.samples = AUDIO_FRAME_SAMPLES;              // # of sample frames fitting the audio buffer
+    audioTarget.userdata = this;                            // callback object
+    audioTarget.callback = NES::IO::audioCallback;          // callback (SDL calls periodically to refill the buffer)
+    audioHandler = SDL_OpenAudioDevice(NULL, 0, &audioTarget, &audioHave, 0);  // buffer size of 512 x 1
+    if (audioHandler == 0)
+    {
+        std::cout << "# of builtin audio devices: " << SDL_GetNumAudioDevices(0) << std::endl;  // "https://wiki.libsdl.org/SDL_GetNumAudioDevices" (why -1?)
+        std::cout << "error initializing audio" << std::endl;
+        std::cout << SDL_GetError() << std::endl;
+    }
 }
 
 NES::IO::~IO()
@@ -219,4 +237,79 @@ void NES::IO::updateInputs(bool *quit, bool *pause, bool *log)
     mem->controllerWrite(1, data1);
 }
 
+void NES::IO::audioAddSample(uint8_t sample)
+{
+    SDL_LockAudioDevice(audioHandler);
+    if ((soundBufferIndex != soundBufferStart) || !soundBufferLoop)
+    {
+        soundBuffer[soundBufferIndex++] = sample;
+        if (soundBufferIndex >= (AUDIO_LATENCY_SAMPLES * 2))
+        {
+            soundBufferIndex = 0;
+            soundBufferLoop = true;
+        }
+        // note this function is never called if game loop is paused
+        uint32_t sampleDiff = ((soundBufferLoop)? (soundBufferIndex + (AUDIO_LATENCY_SAMPLES * 2)) : soundBufferIndex)
+                            - soundBufferStart;
+        if (audioPlaybackPaused && (sampleDiff >= AUDIO_LATENCY_SAMPLES))
+        {
+            SDL_PauseAudioDevice(audioHandler, 0);
+            audioPlaybackPaused = false;
+        }
+        else if (!audioPlaybackPaused && (sampleDiff < AUDIO_FRAME_SAMPLES))
+        {
+            SDL_PauseAudioDevice(audioHandler, 1);
+            audioPlaybackPaused = true;
+        }
+    }
+    SDL_UnlockAudioDevice(audioHandler);
+}
 
+void NES::IO::audioPause(bool p)
+{
+    if (audioPaused != p)
+    {
+        SDL_PauseAudioDevice(audioHandler, ((p)? 1 : 0));
+        audioPaused = p;
+    }
+}
+
+void NES::IO::audioCallback(void* userdata, uint8_t* stream, int len)
+{
+    if (soundBufferLoop)
+    {
+        uint32_t numSamples = (((AUDIO_LATENCY_SAMPLES * 2) - soundBufferStart) >= (uint32_t)(len))? (uint32_t)(len) : ((AUDIO_LATENCY_SAMPLES * 2) - soundBufferStart);
+        memcpy(stream, &soundBuffer[soundBufferStart], numSamples * sizeof(uint8_t));
+        if (numSamples < len)
+        {
+            len -= (int)(numSamples);
+            uint32_t numSamples2 = (soundBufferIndex >= (uint32_t)(len))? len : soundBufferIndex;
+            memcpy(stream + numSamples, soundBuffer, numSamples2 * sizeof(uint8_t));
+            if (numSamples2 < len)
+                memset(stream + numSamples + numSamples2, stream[(numSamples + numSamples2)? (numSamples + numSamples2 - 1) : 0], ((uint32_t)(len) - numSamples2) * sizeof(uint8_t));
+            soundBufferStart = soundBufferStart + numSamples + numSamples2;
+        }
+        else
+            soundBufferStart += numSamples;
+        if (soundBufferStart >= (AUDIO_LATENCY_SAMPLES * 2))
+        {
+            soundBufferStart -= (AUDIO_LATENCY_SAMPLES * 2);
+            soundBufferLoop = false;
+        }
+    }
+    else
+    {
+        uint32_t numSamples = ((soundBufferIndex - soundBufferStart) >= (uint32_t)(len))? (uint32_t)(len) : (soundBufferIndex - soundBufferStart);
+        memcpy(stream, &soundBuffer[soundBufferStart], numSamples * sizeof(uint8_t));
+        if (numSamples < len)
+            memset(stream + numSamples, soundBuffer[(soundBufferIndex)? (soundBufferIndex - 1) : ((AUDIO_LATENCY_SAMPLES * 2) - 1)], ((uint32_t)(len) - numSamples) * sizeof(uint8_t));
+        soundBufferStart += numSamples;
+    }
+}
+
+int NES::IO::audioSampleRate()
+{
+    if (audioHandler == 0)
+        return -1;
+    return audioHave.freq;
+}

@@ -58,7 +58,7 @@ namespace NES
         // filler functions as no PPU tests
         uint8_t ppuRead(uint16_t addr) {return 0x00;}
         bool ppuWrite(uint16_t addr, uint8_t data) {return false;}
-        void connectCPUandPPU(ricoh2A03::CPU *c, ricoh2C02::PPU *p) {}
+        void connect(ricoh2A03::CPU *c, ricoh2C02::PPU *p, ricoh2A03::APU *a) {}
         uint8_t controllerRead(uint8_t player) {return 0x00;}
         bool mapperIrqReq() {return false;}
         void mapperIrqReset() {}

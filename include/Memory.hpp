@@ -7,6 +7,7 @@
 namespace ricoh2A03
 {
     class CPU;
+    class APU;
 }
 
 namespace ricoh2C02
@@ -35,7 +36,7 @@ namespace NES
             virtual uint8_t ppuReadDebug(uint16_t addr) = 0;
         #endif
 
-        virtual void connectCPUandPPU(ricoh2A03::CPU *c, ricoh2C02::PPU *p) = 0;
+        virtual void connect(ricoh2A03::CPU *c, ricoh2C02::PPU *p, ricoh2A03::APU *a) = 0;
 
         virtual uint8_t controllerRead(uint8_t player) = 0;
         virtual void controllerWrite(uint8_t player, uint8_t data) = 0;
@@ -72,7 +73,7 @@ namespace NES
             uint8_t ppuReadDebug(uint16_t addr);
         #endif
 
-        void connectCPUandPPU(ricoh2A03::CPU *c, ricoh2C02::PPU *p);
+        void connect(ricoh2A03::CPU *c, ricoh2C02::PPU *p, ricoh2A03::APU *a);
 
         uint8_t controllerRead(uint8_t player);
         void controllerWrite(uint8_t player, uint8_t data);
@@ -84,9 +85,6 @@ namespace NES
         void finalizeDMAreq();
         bool DMAactive();
         void handleDMA();
-
-        // bool mapperIRQ();
-        // void mapperResetIRQ();
     
     private:
         uint8_t *cpuMemory = nullptr;   // modifiable cpu memory 0x0000 - 0x401F
@@ -96,6 +94,7 @@ namespace NES
 
         ricoh2A03::CPU *cpu = nullptr;
         ricoh2C02::PPU *ppu = nullptr;
+        ricoh2A03::APU *apu = nullptr;
 
         uint8_t controllerBuffer1 = 0x00;   // buffered input for controller
         uint8_t controllerBuffer2 = 0x00;   // buffered input for controller

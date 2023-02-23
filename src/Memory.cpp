@@ -2,6 +2,7 @@
 #include "../include/Mapper.hpp"
 #include "../include/Ricoh2A03.hpp"
 #include "../include/Ricoh2C02.hpp"
+#include "../include/APU.hpp"
 
 #include <iostream>
 
@@ -36,7 +37,9 @@ uint8_t NES::NESmemory::cpuRead(uint16_t addr)
     {
         if (addr == 0x4014)
             return ppu->cpuRead(addr);
-        return cpuMemory[addr];
+        else if (addr == 0x4015)
+            return apu->cpuRead(addr);
+        return 0x00;
     }
     else if (addr <= 0x4017)        // controller serial read
     {
@@ -61,12 +64,20 @@ bool NES::NESmemory::cpuWrite(uint16_t addr, uint8_t data)
         return ppu->cpuWrite(addr, data);
     else if (addr <= 0x401F)
     {
-        if (addr == 0x4014)
+        if (addr <= 0x4013)
+            return apu->cpuWrite(addr, data);
+        else if (addr == 0x4014)
             return ppu->cpuWrite(addr, data);
-        else if (addr == 0x4016)
-            cpuMemory[addr] = controllerBuffer1;
-        else if (addr == 0x4017)
-            cpuMemory[addr] = controllerBuffer2;
+        else if ((addr == 0x4015) || (addr == 0x4017))
+            return apu->cpuWrite(addr, data);
+        else if (addr == 0x4016)                            // write 1 to $4016 to signal controller to poll input, then 0 to stop poll
+        {                                                   // read polled data one bit at a time from $4016 or $4017
+            if (data == 0x01)
+            {
+                cpuMemory[0x4016] = controllerBuffer1;
+                cpuMemory[0x4017] = controllerBuffer2;
+            }
+        }
         else
             cpuMemory[addr] = data;
         return true;
@@ -146,10 +157,11 @@ bool NES::NESmemory::ppuWrite(uint16_t addr, uint8_t data)
     }
 #endif
 
-void NES::NESmemory::connectCPUandPPU(ricoh2A03::CPU *c, ricoh2C02::PPU *p)
+void NES::NESmemory::connect(ricoh2A03::CPU *c, ricoh2C02::PPU *p, ricoh2A03::APU *a)
 {
     cpu = c;
     ppu = p;
+    apu = a;
 }
 
 uint8_t NES::NESmemory::controllerRead(uint8_t player)
@@ -212,9 +224,3 @@ void NES::NESmemory::handleDMA()
         DMAcycles--;
     }
 }
-
-/*
-bool NES::NESmemory::mapperIRQ() {return mapper->IRQcheck();}
-
-void NES::NESmemory::mapperResetIRQ() {mapper->IRQreset();}
-*/

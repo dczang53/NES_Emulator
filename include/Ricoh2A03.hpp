@@ -1,5 +1,5 @@
-#ifndef _RICOH2A03
-#define _RICOH2A03
+#ifndef _RICOH2A03_CPU
+#define _RICOH2A03_CPU
 
 #include <cstdint>
 

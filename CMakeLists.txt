@@ -82,6 +82,7 @@ add_library(Memory STATIC include/Memory.hpp src/Memory.cpp)
 add_library(RICOH2A03 STATIC include/Ricoh2A03.hpp src/Ricoh2A03.cpp)
 add_library(RICOH2C02 STATIC include/Ricoh2C02.hpp src/Ricoh2C02.cpp)
 add_library(IO STATIC include/IO.hpp src/IO.cpp)
+add_library(APU STATIC include/APU.hpp src/APU.cpp)
 
 add_executable(NES_Emulator main.cpp)
 
@@ -104,11 +105,13 @@ target_link_libraries(RICOH2A03 PUBLIC Memory)
 target_link_libraries(RICOH2C02 PUBLIC Memory)
 target_link_libraries(IO INTERFACE Memory)
 target_link_libraries(IO PRIVATE SDL2::SDL2)
+target_link_libraries(APU INTERFACE IO)
+target_link_libraries(APU PUBLIC Memory)
 
 if(gtest)
-    target_link_libraries(NES_Emulator PRIVATE Mapper Memory RICOH2A03 RICOH2C02 IO gtest)
+    target_link_libraries(NES_Emulator PRIVATE Mapper Memory RICOH2A03 RICOH2C02 IO APU gtest)
 else()
-    target_link_libraries(NES_Emulator PRIVATE Mapper Memory RICOH2A03 RICOH2C02 IO SDL2::SDL2)
+    target_link_libraries(NES_Emulator PRIVATE Mapper Memory RICOH2A03 RICOH2C02 IO APU SDL2::SDL2)
 endif(gtest)
 
 set(CPACK_PROJECT_NAME ${PROJECT_NAME})
