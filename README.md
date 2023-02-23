@@ -51,12 +51,11 @@ An amateur attempt at writing a simple emulator in C++ for the Nintendo Entertai
 
 ### *TODO*:
 
-* Implementing Audio  
+* Adding savestates
 * Testing compilation on Mac (already tested for Linux and Windows MinGW)  
   
 ### *Further Optimizations to Consider*:
 
-* Multithreading (separate rendering into separate loop; although there are no problems with single-threaded performance)  
 * Reimplementing CPU and PPU as JITs  
   
 Shoutout to the Nesdev Wiki and r/Emudev for resources and documentation.
